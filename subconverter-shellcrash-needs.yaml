@@ -1,0 +1,156 @@
+# ShellCrash 当前实际需求的订阅转换后端模板
+# 说明：
+# - 这是一份供 Mihomo / 订阅转换后端使用的 YAML 模板，不直接内置节点。
+# - 转换后端负责注入订阅节点；本文件只表达当前 ShellCrash 的路由需求、DNS 行为与策略组结构。
+# - 基于本机当前生效需求整理：AI 优先美区、Telegram 优先新加坡、国内流量默认直连、其他流量走区域选择。
+
+x-url-test: &url-test
+  type: url-test
+  url: http://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 50
+  include-all: true
+
+x-filter-hk: &filter-hk "(?i)港|hk|hong ?kong|🇭🇰"
+x-filter-jp: &filter-jp "(?i)日|jp|japan|tokyo|🇯🇵"
+x-filter-sg: &filter-sg "(?i)新|sg|singapore|🇸🇬"
+x-filter-us: &filter-us "(?i)美|us|usa|america|united states|🇺🇸"
+
+x-rule-set-domain: &rule-set-domain
+  type: http
+  behavior: domain
+  format: mrs
+  interval: 86400
+
+x-rule-set-ipcidr: &rule-set-ipcidr
+  type: http
+  behavior: ipcidr
+  format: mrs
+  interval: 86400
+
+mode: rule
+mixed-port: 7890
+allow-lan: true
+ipv6: false
+log-level: info
+external-controller: ":9090"
+
+profile:
+  store-selected: true
+
+# 保留当前 ShellCrash 的 DNS 需求：
+# - fake-ip
+# - 监听 0.0.0.0:1053 供局域网/宿主机使用
+# - 仅对局域网/本地域名做 fake-ip 排除
+# - 上游继续使用阿里/腾讯 DoH
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 223.5.5.5
+    - 1.1.1.1
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  fake-ip-filter:
+    - "*.lan"
+    - "*.local"
+    - "*.localhost"
+
+proxy-groups:
+  - name: 🚀 节点选择
+    type: select
+    proxies:
+      - 🇭🇰 香港
+      - 🇯🇵 日本
+      - 🇸🇬 新加坡
+      - 🇺🇸 美国
+      - DIRECT
+
+  - name: 🤖 AI 服务
+    type: select
+    proxies:
+      - 🇺🇸 美国
+      - 🇯🇵 日本
+      - 🇸🇬 新加坡
+      - 🇭🇰 香港
+      - 🚀 节点选择
+
+  - name: 📲 Telegram
+    type: select
+    proxies:
+      - 🇸🇬 新加坡
+      - 🇭🇰 香港
+      - 🇯🇵 日本
+      - 🇺🇸 美国
+      - 🚀 节点选择
+
+  - name: 🎯 国内流量
+    type: select
+    proxies:
+      - DIRECT
+      - 🚀 节点选择
+      - 🇭🇰 香港
+
+  - name: 🇭🇰 香港
+    <<: *url-test
+    filter: *filter-hk
+
+  - name: 🇯🇵 日本
+    <<: *url-test
+    filter: *filter-jp
+
+  - name: 🇸🇬 新加坡
+    <<: *url-test
+    filter: *filter-sg
+
+  - name: 🇺🇸 美国
+    <<: *url-test
+    filter: *filter-us
+
+rule-providers:
+  AI:
+    <<: *rule-set-domain
+    url: https://github.com/666OS/rules/raw/release/mihomo/domain/AI.mrs
+  China:
+    <<: *rule-set-domain
+    url: https://github.com/666OS/rules/raw/release/mihomo/domain/China.mrs
+  ChinaIP:
+    <<: *rule-set-ipcidr
+    url: https://github.com/666OS/rules/raw/release/mihomo/ip/China.mrs
+  Telegram:
+    <<: *rule-set-domain
+    url: https://github.com/666OS/rules/raw/release/mihomo/domain/Telegram.mrs
+  TelegramIP:
+    <<: *rule-set-ipcidr
+    url: https://github.com/666OS/rules/raw/release/mihomo/ip/Telegram.mrs
+
+rules:
+  # 本地/私网直连：保护宿主机、Docker、CGNAT 与 IPv6 本地链路
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+  - IP-CIDR6,::1/128,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+
+  # AI 走独立策略组
+  - RULE-SET,AI,🤖 AI 服务
+
+  # Telegram 优先新加坡
+  - RULE-SET,Telegram,📲 Telegram
+  - RULE-SET,TelegramIP,📲 Telegram,no-resolve
+
+  # 中国大陆流量默认直连
+  - RULE-SET,China,🎯 国内流量
+  - RULE-SET,ChinaIP,🎯 国内流量,no-resolve
+  - GEOIP,CN,🎯 国内流量
+
+  # 其他全部走总策略
+  - MATCH,🚀 节点选择
