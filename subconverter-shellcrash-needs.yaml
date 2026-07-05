@@ -3,13 +3,24 @@
 # - 这是一份供 Mihomo / 订阅转换后端使用的 YAML 模板，不直接内置节点。
 # - 转换后端负责注入订阅节点；本文件只表达当前 ShellCrash 的路由需求、DNS 行为与策略组结构。
 # - 基于本机当前生效需求整理：AI 优先美区、Telegram 优先新加坡、国内流量默认直连、其他流量走区域选择。
+# - 地区组采用“手动指定节点优先，失效后自动 fallback 到同地区可连通节点”的结构。
+# - 显式将 nvidia.com 纳入 AI 分组，避免依赖外部规则集是否覆盖。
 
-x-url-test: &url-test
+x-region-auto: &region-auto
   type: url-test
   url: http://www.gstatic.com/generate_204
   interval: 300
   tolerance: 50
   include-all: true
+
+x-region-manual: &region-manual
+  type: select
+  include-all: true
+
+x-region-fallback: &region-fallback
+  type: fallback
+  url: http://www.gstatic.com/generate_204
+  interval: 300
 
 x-filter-hk: &filter-hk "(?i)港|hk|hong ?kong|🇭🇰"
 x-filter-jp: &filter-jp "(?i)日|jp|japan|tokyo|🇯🇵"
@@ -95,20 +106,63 @@ proxy-groups:
       - 🚀 节点选择
       - 🇭🇰 香港
 
+  # 地区主组：先走“手动指定节点”，失败后回退到“同地区自动组”
   - name: 🇭🇰 香港
-    <<: *url-test
-    filter: *filter-hk
+    <<: *region-fallback
+    proxies:
+      - 🇭🇰 香港-手动
+      - 🇭🇰 香港-自动
 
   - name: 🇯🇵 日本
-    <<: *url-test
-    filter: *filter-jp
+    <<: *region-fallback
+    proxies:
+      - 🇯🇵 日本-手动
+      - 🇯🇵 日本-自动
 
   - name: 🇸🇬 新加坡
-    <<: *url-test
-    filter: *filter-sg
+    <<: *region-fallback
+    proxies:
+      - 🇸🇬 新加坡-手动
+      - 🇸🇬 新加坡-自动
 
   - name: 🇺🇸 美国
-    <<: *url-test
+    <<: *region-fallback
+    proxies:
+      - 🇺🇸 美国-手动
+      - 🇺🇸 美国-自动
+
+  # 手动组：用于在同地区内手动指定具体节点
+  - name: 🇭🇰 香港-手动
+    <<: *region-manual
+    filter: *filter-hk
+
+  - name: 🇯🇵 日本-手动
+    <<: *region-manual
+    filter: *filter-jp
+
+  - name: 🇸🇬 新加坡-手动
+    <<: *region-manual
+    filter: *filter-sg
+
+  - name: 🇺🇸 美国-手动
+    <<: *region-manual
+    filter: *filter-us
+
+  # 自动组：仅作为同地区兜底，不参与跨地区回退
+  - name: 🇭🇰 香港-自动
+    <<: *region-auto
+    filter: *filter-hk
+
+  - name: 🇯🇵 日本-自动
+    <<: *region-auto
+    filter: *filter-jp
+
+  - name: 🇸🇬 新加坡-自动
+    <<: *region-auto
+    filter: *filter-sg
+
+  - name: 🇺🇸 美国-自动
+    <<: *region-auto
     filter: *filter-us
 
 rule-providers:
@@ -139,6 +193,9 @@ rules:
   - IP-CIDR6,::1/128,DIRECT,no-resolve
   - IP-CIDR6,fc00::/7,DIRECT,no-resolve
   - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+
+  # 显式补充 AI 域名，避免外部 AI 规则集未覆盖时走错组
+  - DOMAIN-SUFFIX,nvidia.com,🤖 AI 服务
 
   # AI 走独立策略组
   - RULE-SET,AI,🤖 AI 服务
