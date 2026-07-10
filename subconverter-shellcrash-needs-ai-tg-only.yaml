@@ -24,10 +24,14 @@ x-region-fallback: &region-fallback
 
 # 节点池限定：仅匹配名称同时包含 `CFST` 与对应地区关键词的节点
 # （mihomo 使用 regexp2，支持 lookahead；两个 (?=...) 表示 AND）
-x-filter-hk: &filter-hk "(?i)(?=.*cfst)(?=.*(港|hk|hong ?kong|🇭🇰))"
-x-filter-jp: &filter-jp "(?i)(?=.*cfst)(?=.*(日|jp|japan|tokyo|🇯🇵))"
-x-filter-sg: &filter-sg "(?i)(?=.*cfst)(?=.*(新|sg|singapore|🇸🇬))"
-x-filter-us: &filter-us "(?i)(?=.*cfst)(?=.*(美|us|usa|america|united states|🇺🇸))"
+x-filter-hk: &filter-hk "(?i)(港|hk|hong ?kong|🇭🇰)"
+x-filter-jp: &filter-jp "(?i)(日|jp|japan|tokyo|🇯🇵)"
+x-filter-sg: &filter-sg "(?i)(新|sg|singapore|🇸🇬)"
+x-filter-us: &filter-us "(?i)(美|us|usa|america|united states|🇺🇸)"
+# CFST+地区：匹配同时含 CFST 与地区关键词的节点
+x-filter-cfst-hk: &filter-cfst-hk "(?i)(?=.*cfst)(?=.*(港|hk|hong ?kong|🇭🇰))"
+x-filter-cfst-jp: &filter-cfst-jp "(?i)(?=.*cfst)(?=.*(日|jp|japan|tokyo|🇯🇵))"
+x-filter-cfst-sg: &filter-cfst-sg "(?i)(?=.*cfst)(?=.*(新|sg|singapore|🇸🇬))"
 # 仅匹配 CFST 前缀（不限地区），供“其余地区”组作为正向过滤
 x-filter-cfst: &filter-cfst "(?i)cfst"
 # 排除四大地区关键词（供“其余地区”组作为排除过滤）
@@ -113,18 +117,21 @@ proxy-groups:
     <<: *region-fallback
     proxies:
       - 🇭🇰 香港-手动
+      - 🇭🇰 香港-CFST
       - 🇭🇰 香港-自动
 
   - name: 🇯🇵 日本
     <<: *region-fallback
     proxies:
       - 🇯🇵 日本-手动
+      - 🇯🇵 日本-CFST
       - 🇯🇵 日本-自动
 
   - name: 🇸🇬 新加坡
     <<: *region-fallback
     proxies:
       - 🇸🇬 新加坡-手动
+      - 🇸🇬 新加坡-CFST
       - 🇸🇬 新加坡-自动
 
   - name: 🇺🇸 美国
@@ -144,13 +151,25 @@ proxy-groups:
     <<: *region-manual
     filter: *filter-hk
 
+  - name: 🇭🇰 香港-CFST
+    <<: *region-auto
+    filter: *filter-cfst-hk
+
   - name: 🇯🇵 日本-手动
     <<: *region-manual
     filter: *filter-jp
 
+  - name: 🇯🇵 日本-CFST
+    <<: *region-auto
+    filter: *filter-cfst-jp
+
   - name: 🇸🇬 新加坡-手动
     <<: *region-manual
     filter: *filter-sg
+
+  - name: 🇸🇬 新加坡-CFST
+    <<: *region-auto
+    filter: *filter-cfst-sg
 
   - name: 🇺🇸 美国-手动
     <<: *region-manual
