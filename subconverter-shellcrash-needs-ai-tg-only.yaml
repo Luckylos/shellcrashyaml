@@ -22,10 +22,15 @@ x-region-fallback: &region-fallback
   url: http://www.gstatic.com/generate_204
   interval: 300
 
-x-filter-hk: &filter-hk "(?i)港|hk|hong ?kong|🇭🇰"
-x-filter-jp: &filter-jp "(?i)日|jp|japan|tokyo|🇯🇵"
-x-filter-sg: &filter-sg "(?i)新|sg|singapore|🇸🇬"
-x-filter-us: &filter-us "(?i)美|us|usa|america|united states|🇺🇸"
+# 节点池限定：仅匹配名称同时包含 `CFST` 与对应地区关键词的节点
+# （mihomo 使用 regexp2，支持 lookahead；两个 (?=...) 表示 AND）
+x-filter-hk: &filter-hk "(?i)(?=.*cfst)(?=.*(港|hk|hong ?kong|🇭🇰))"
+x-filter-jp: &filter-jp "(?i)(?=.*cfst)(?=.*(日|jp|japan|tokyo|🇯🇵))"
+x-filter-sg: &filter-sg "(?i)(?=.*cfst)(?=.*(新|sg|singapore|🇸🇬))"
+x-filter-us: &filter-us "(?i)(?=.*cfst)(?=.*(美|us|usa|america|united states|🇺🇸))"
+# 仅匹配 CFST 前缀（不限地区），供“其余地区”组作为正向过滤
+x-filter-cfst: &filter-cfst "(?i)cfst"
+# 排除四大地区关键词（供“其余地区”组作为排除过滤）
 x-filter-known-regions: &filter-known-regions "(?i)港|hk|hong ?kong|🇭🇰|日|jp|japan|tokyo|🇯🇵|新|sg|singapore|🇸🇬|美|us|usa|america|united states|🇺🇸"
 
 x-rule-set-domain: &rule-set-domain
@@ -153,6 +158,7 @@ proxy-groups:
 
   - name: 其余地区-手动
     <<: *region-manual
+    filter: *filter-cfst
     exclude-filter: *filter-known-regions
 
   # 自动组：仅作为同地区兜底，不参与跨地区回退
@@ -174,6 +180,7 @@ proxy-groups:
 
   - name: 其余地区-自动
     <<: *region-auto
+    filter: *filter-cfst
     exclude-filter: *filter-known-regions
 
 rule-providers:
