@@ -51,3 +51,13 @@
 ## 参考
 
 - https://raw.githubusercontent.com/666OS/YYDS/refs/heads/main/mihomo/config/cn/Pro_cn.yaml
+
+## OpenCode 独立出口 listeners
+
+模板内置 3 个仅绑定 Docker bridge 网关 `172.17.0.1` 的 mixed listeners，供容器化 New-API 以渠道级 `proxy` 使用：
+
+- `17891` → `🇺🇸 US COX ISP`
+- `17892` → `🇺🇸 US COX ISP 2`
+- `17893` → `🇺🇸 US家宽`
+
+这些端口只绑定 Docker bridge 网关，不对 LAN 开放。New-API 仍需将多密钥渠道拆成“一把密钥一个渠道”，再分别填写 `http://172.17.0.1:<port>`；普通渠道权重是加权随机，不是严格轮询。
