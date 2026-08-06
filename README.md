@@ -54,12 +54,18 @@
 
 ## OpenCode 独立出口 listeners
 
-模板内置 3 个仅绑定 Docker bridge 网关 `172.17.0.1` 的 mixed listeners，供容器化客户端使用：
+模板内置 9 个仅绑定 Docker bridge 网关 `172.17.0.1` 的 mixed listeners，供容器化客户端使用：
 
 - `17891` → `🎛️ OpenCode 出口 1`
 - `17892` → `🎛️ OpenCode 出口 2`
 - `17893` → `🎛️ OpenCode 出口 3`
+- `17894` → `🎛️ OpenCode 出口 4`
+- `17895` → `🎛️ OpenCode 出口 5`
+- `17896` → `🎛️ OpenCode 出口 6`
+- `17897` → `🎛️ OpenCode 出口 7`
+- `17898` → `🎛️ OpenCode 出口 8`
+- `17899` → `🎛️ OpenCode 出口 9`
 
-三个出口均为 `type: select` 的纯手动策略组，通过 `include-all: true` 纳入订阅中的全部节点：不测速、不自动切换，用户可在 Mihomo 面板中为每个端口独立选择节点。`profile.store-selected: true` 会将选择保存到 `cache.db`，正常重启后继续沿用。
+九个出口均为 `type: select` 的纯手动策略组，通过 `include-all: true` 纳入订阅中的全部节点：不测速、不自动切换，用户可在 Mihomo 面板中为每个端口独立选择节点。它们排在 `proxy-groups` 末尾，因此在面板中显示于常规分组之后。`profile.store-selected: true` 会将选择保存到 `cache.db`，正常重启后继续沿用。
 
 这些端口只绑定 Docker bridge 网关，不对 LAN 开放。
