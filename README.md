@@ -4,8 +4,7 @@
 
 ## 文件
 
-- `subconverter-shellcrash-needs.yaml`：标准版，包含 `🤖 AI 服务`、`📲 Telegram`、`🎯 国内流量` 三类独立分流
-- `subconverter-shellcrash-needs-ai-tg-only.yaml`：额外版，仅单独分离 `🤖 AI 服务` 与 `📲 Telegram`，不单独划分中国大陆流量
+- `subconverter-shellcrash-needs.yaml`：唯一模板。分流 `🤖 AI 服务`、`📲 Telegram`，其余流量统一交给 `🐟 漏网之鱼`
 
 ## 设计目标
 
@@ -14,28 +13,33 @@
 - 风格参考 `666OS/YYDS` 的 `Pro_cn.yaml`
 - 地区节点支持“手动指定优先，失效后同地区自动回退”
 - 未匹配到已知地区关键字的节点统一归入 `其余地区`
+- **不做中国大陆直连分流**，未命中规则的流量一律走代理
 
 ## 当前策略
 
-### 标准版 `subconverter-shellcrash-needs.yaml`
-
 - `🤖 AI 服务`：美国优先
 - `📲 Telegram`：新加坡优先
-- `🎯 国内流量`：默认直连
-- 其他流量：走 `🚀 节点选择`
+- `🐟 漏网之鱼`：其余全部流量（含中国大陆）默认跟随 `🚀 节点选择`
 - 未命中港/日/新/美筛选规则的节点：归入 `其余地区`
-- 私网/本地地址：强制直连
+- 私网/回环/IPv6 本地链路：强制直连
 - DNS：`fake-ip + 0.0.0.0:1053 + 阿里/腾讯 DoH`
 
-### 额外版 `subconverter-shellcrash-needs-ai-tg-only.yaml`
+### 关于“去掉直连”
 
-- `🤖 AI 服务`：美国优先
-- `📲 Telegram`：新加坡优先
-- 不单独划分中国大陆流量
-- 其他流量：统一走 `🚀 节点选择`
-- 未命中港/日/新/美筛选规则的节点：归入 `其余地区`
-- 私网/本地地址：强制直连
-- DNS：`fake-ip + 0.0.0.0:1053 + 阿里/腾讯 DoH`
+模板不再包含 `🎯 国内流量` 分组，也不再加载 `China` / `ChinaIP` 规则集与 `GEOIP,CN`。
+规则表末尾由 `MATCH,🐟 漏网之鱼` 收口，因此**访问国内站点也会经过节点**。
+
+仍然保留的 9 条 `DIRECT` 规则只覆盖私网与本地地址：
+
+```text
+127.0.0.0/8  10.0.0.0/8  172.16.0.0/12  192.168.0.0/16
+100.64.0.0/10  169.254.0.0/16  ::1/128  fc00::/7  fe80::/10
+```
+
+这些**不能删**。当前 ShellCrash 以 TUN/TPROXY + host 网络运行，出口 listeners 绑定在
+Docker bridge 网关 `172.17.0.1`；一旦把私网段也灌进隧道，宿主机、容器互访与 LAN 可达性会一起断掉。
+
+`🐟 漏网之鱼` 组内末位保留 `DIRECT` 作为**手动**开关，仅用于临时排障，默认不选中。
 
 ## 说明
 
@@ -52,20 +56,29 @@
 
 - https://raw.githubusercontent.com/666OS/YYDS/refs/heads/main/mihomo/config/cn/Pro_cn.yaml
 
-## OpenCode 独立出口 listeners
+## 独立出口 listeners
 
-模板内置 9 个仅绑定 Docker bridge 网关 `172.17.0.1` 的 mixed listeners，供容器化客户端使用：
+模板内置 9 个仅绑定 Docker bridge 网关 `172.17.0.1` 的 mixed listeners。
+它们不绑定任何特定应用，任何需要固定出口的客户端都可以使用——New-API 渠道级 proxy、
+各类 CLI 工具、脚本、容器化服务等：
 
-- `17891` → `🎛️ OpenCode 出口 1`
-- `17892` → `🎛️ OpenCode 出口 2`
-- `17893` → `🎛️ OpenCode 出口 3`
-- `17894` → `🎛️ OpenCode 出口 4`
-- `17895` → `🎛️ OpenCode 出口 5`
-- `17896` → `🎛️ OpenCode 出口 6`
-- `17897` → `🎛️ OpenCode 出口 7`
-- `17898` → `🎛️ OpenCode 出口 8`
-- `17899` → `🎛️ OpenCode 出口 9`
+| 端口 | listener | 策略组 |
+|---|---|---|
+| `17891` | `egress-1` | `🎛️ 出口 1` |
+| `17892` | `egress-2` | `🎛️ 出口 2` |
+| `17893` | `egress-3` | `🎛️ 出口 3` |
+| `17894` | `egress-4` | `🎛️ 出口 4` |
+| `17895` | `egress-5` | `🎛️ 出口 5` |
+| `17896` | `egress-6` | `🎛️ 出口 6` |
+| `17897` | `egress-7` | `🎛️ 出口 7` |
+| `17898` | `egress-8` | `🎛️ 出口 8` |
+| `17899` | `egress-9` | `🎛️ 出口 9` |
 
 九个出口均为 `type: select` 的纯手动策略组，通过 `include-all: true` 纳入订阅中的全部节点：不测速、不自动切换，用户可在 Mihomo 面板中为每个端口独立选择节点。它们排在 `proxy-groups` 末尾，因此在面板中显示于常规分组之后。`profile.store-selected: true` 会将选择保存到 `cache.db`，正常重启后继续沿用。
 
 这些端口只绑定 Docker bridge 网关，不对 LAN 开放。
+
+> **重命名提示**：策略组名是 `store-selected` 在 `cache.db` 里的键。
+> 从 `🎛️ OpenCode 出口 N` 改名为 `🎛️ 出口 N` 后，此前保存的节点选择不会自动继承，
+> 需要在面板中重新为 9 个出口各选一次节点。**监听端口未变**，因此引用 `17891-17899`
+> 的下游配置（如 New-API 渠道 proxy）无需改动。
